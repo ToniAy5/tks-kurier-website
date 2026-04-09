@@ -2,6 +2,21 @@
 const lang = localStorage.getItem('tks-language') || 'de';
 document.documentElement.setAttribute('data-lang', lang);
 
+// ── Scroll Progress Bar ──
+const progressBar = document.createElement('div');
+progressBar.className = 'scroll-progress';
+document.body.prepend(progressBar);
+
+window.addEventListener('scroll', () => {
+  const scrolled = window.scrollY;
+  const total = document.documentElement.scrollHeight - window.innerHeight;
+  progressBar.style.width = total > 0 ? (scrolled / total * 100) + '%' : '0%';
+
+  // Header shadow on scroll
+  const header = document.querySelector('.header');
+  if (header) header.classList.toggle('scrolled', scrolled > 10);
+}, { passive: true });
+
 function toggleLanguage() {
   const current = document.documentElement.getAttribute('data-lang');
   const next = current === 'de' ? 'en' : 'de';
@@ -38,11 +53,53 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 1000);
   }
 
+  // Stagger delays for grid children
+  document.querySelectorAll('.services-grid, .trust-grid, .values-grid, .testimonials-grid, .stats-grid, .usp-grid').forEach(grid => {
+    grid.querySelectorAll(':scope > *').forEach((child, i) => {
+      child.classList.add('animate');
+      child.style.transitionDelay = (i * 0.1) + 's';
+    });
+  });
+
+  // Counter animation for stat numbers
+  function animateCounter(el) {
+    const target = parseFloat(el.dataset.count);
+    const suffix = el.dataset.suffix || '';
+    const prefix = el.dataset.prefix || '';
+    const duration = 1800;
+    const start = performance.now();
+    const update = (now) => {
+      const progress = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const value = Math.floor(target * eased);
+      // Format with locale thousands separator
+      el.textContent = prefix + value.toLocaleString('de-DE') + suffix;
+      if (progress < 1) requestAnimationFrame(update);
+    };
+    requestAnimationFrame(update);
+  }
+
   // Scroll animations
   const observer = new IntersectionObserver((entries) => {
-    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
-  }, { threshold: 0.1 });
-  document.querySelectorAll('.animate').forEach(el => observer.observe(el));
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        // Trigger counter if applicable
+        if (e.target.classList.contains('stat') || e.target.closest('.stat')) {
+          const counter = (e.target.classList.contains('stat') ? e.target : e.target.closest('.stat')).querySelector('[data-count]');
+          if (counter && !counter.dataset.animated) {
+            counter.dataset.animated = '1';
+            animateCounter(counter);
+          }
+        }
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.15 });
+  document.querySelectorAll('.animate, .animate-left, .animate-right, .animate-scale').forEach(el => observer.observe(el));
+
+  // Also observe stats for counter
+  document.querySelectorAll('.stat').forEach(el => observer.observe(el));
 });
 
 function acceptCookies() {
