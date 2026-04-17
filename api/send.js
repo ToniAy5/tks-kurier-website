@@ -1,4 +1,4 @@
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 
 const escape = (s) =>
   String(s).replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -142,27 +142,37 @@ export default async function handler(req, res) {
 </table></body></html>`;
 
     const missing = [];
-    if (!process.env.RESEND_API_KEY) missing.push('RESEND_API_KEY');
-    if (!process.env.RESEND_FROM)    missing.push('RESEND_FROM');
-    if (!process.env.RESEND_TO)      missing.push('RESEND_TO');
+    if (!process.env.SMTP_HOST) missing.push('SMTP_HOST');
+    if (!process.env.SMTP_PORT) missing.push('SMTP_PORT');
+    if (!process.env.SMTP_USER) missing.push('SMTP_USER');
+    if (!process.env.SMTP_PASS) missing.push('SMTP_PASS');
+    if (!process.env.MAIL_FROM) missing.push('MAIL_FROM');
+    if (!process.env.MAIL_TO)   missing.push('MAIL_TO');
     if (missing.length) {
       console.error('Missing env vars:', missing.join(', '));
       return res.status(500).json({ error: `Server-Konfiguration fehlt: ${missing.join(', ')}` });
     }
 
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const sendResult = await resend.emails.send({
-      from: process.env.RESEND_FROM,
-      to: process.env.RESEND_TO,
-      reply_to: fields.email,
-      subject,
-      html,
+    const port = Number(process.env.SMTP_PORT);
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port,
+      secure: port === 465,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
     });
 
-    if (sendResult && sendResult.error) {
-      console.error('Resend error', sendResult.error);
-      const msg = sendResult.error.message || 'Mail konnte nicht versendet werden.';
-      return res.status(502).json({ error: `Resend: ${msg}` });
+    try {
+      await transporter.sendMail({
+        from: process.env.MAIL_FROM,
+        to: process.env.MAIL_TO,
+        replyTo: fields.email,
+        subject,
+        html,
+      });
+    } catch (mailErr) {
+      console.error('SMTP error', mailErr);
+      const msg = mailErr && mailErr.message ? mailErr.message : 'Mail konnte nicht versendet werden.';
+      return res.status(502).json({ error: `SMTP: ${msg}` });
     }
 
     return res.status(200).json({ ok: true });
