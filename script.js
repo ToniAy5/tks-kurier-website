@@ -192,8 +192,11 @@ async function submitProtectedForm(e, type) {
         openedAt: Number(form.dataset.openedAt) || 0,
       }),
     });
-    const result = await resp.json().catch(() => ({}));
-    if (!resp.ok || !result.ok) throw new Error(result.error || 'Unbekannter Fehler');
+    const result = await resp.json().catch(() => null);
+    if (!resp.ok || !result || !result.ok) {
+      const detail = (result && result.error) ? result.error : `HTTP ${resp.status}`;
+      throw new Error(detail);
+    }
 
     const success = type === 'contact'
       ? { title: 'Nachricht gesendet!', text: 'Vielen Dank! Wir melden uns in Kürze bei Ihnen.' }

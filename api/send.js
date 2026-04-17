@@ -141,17 +141,28 @@ export default async function handler(req, res) {
   </td></tr>
 </table></body></html>`;
 
-    await resend.emails.send({
+    if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM || !process.env.RESEND_TO) {
+      console.error('Missing Resend env vars');
+      return res.status(500).json({ error: 'E-Mail-Konfiguration fehlt (Server).' });
+    }
+
+    const sendResult = await resend.emails.send({
       from: process.env.RESEND_FROM,
       to: process.env.RESEND_TO,
-      replyTo: fields.email,
+      reply_to: fields.email,
       subject,
       html,
     });
 
+    if (sendResult && sendResult.error) {
+      console.error('Resend error', sendResult.error);
+      const msg = sendResult.error.message || 'Mail konnte nicht versendet werden.';
+      return res.status(502).json({ error: `Resend: ${msg}` });
+    }
+
     return res.status(200).json({ ok: true });
   } catch (err) {
     console.error('send error', err);
-    return res.status(500).json({ error: 'Server-Fehler. Bitte später erneut versuchen.' });
+    return res.status(500).json({ error: `Server-Fehler: ${err && err.message ? err.message : 'unbekannt'}` });
   }
 }
