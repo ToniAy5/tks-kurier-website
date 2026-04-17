@@ -1,3 +1,8 @@
+// ── Cloudflare Turnstile (Site Key) ──
+// Hier deinen öffentlichen Site-Key aus dem Cloudflare Dashboard einfügen.
+// (Der Secret-Key gehört NICHT hierher, sondern als Vercel Env-Var.)
+const TURNSTILE_SITE_KEY = '0x4AAAAAAC-8e0-TSwWm797j';
+
 // ── Language ──
 const lang = localStorage.getItem('tks-language') || 'de';
 document.documentElement.setAttribute('data-lang', lang);
@@ -100,6 +105,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Also observe stats for counter
   document.querySelectorAll('.stat').forEach(el => observer.observe(el));
+
+  // ── Init protected forms (honeypot + Turnstile + timestamp) ──
+  const protectedForms = document.querySelectorAll(
+    'form[onsubmit*="submitContactForm"], form[onsubmit*="submitQuoteForm"]'
+  );
+  if (protectedForms.length) {
+    if (!document.getElementById('cf-turnstile-script')) {
+      const s = document.createElement('script');
+      s.id = 'cf-turnstile-script';
+      s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+      s.async = true; s.defer = true;
+      document.head.appendChild(s);
+    }
+    protectedForms.forEach(form => {
+      form.dataset.openedAt = Date.now();
+      // Honeypot field — invisible to humans, bots fill it
+      const hp = document.createElement('input');
+      hp.type = 'text'; hp.name = 'website'; hp.tabIndex = -1;
+      hp.autocomplete = 'off'; hp.className = 'hp-field';
+      hp.setAttribute('aria-hidden', 'true');
+      form.appendChild(hp);
+      // Turnstile widget container
+      const t = document.createElement('div');
+      t.className = 'cf-turnstile';
+      t.dataset.sitekey = TURNSTILE_SITE_KEY;
+      t.dataset.theme = 'light';
+      t.style.marginTop = '1rem';
+      const submit = form.querySelector('button[type=submit]');
+      if (submit) submit.parentNode.insertBefore(t, submit);
+      else form.appendChild(t);
+    });
+  }
 });
 
 function acceptCookies() {
@@ -111,51 +148,59 @@ function declineCookies() {
   document.getElementById('cookie-banner').classList.remove('visible');
 }
 
-// ── Contact Form ──
-async function submitContactForm(e) {
+// ── Contact / Quote Form Submit ──
+function submitContactForm(e) { return submitProtectedForm(e, 'contact'); }
+function submitQuoteForm(e)   { return submitProtectedForm(e, 'quote');   }
+
+async function submitProtectedForm(e, type) {
   e.preventDefault();
   const form = e.target;
   const btn = form.querySelector('button[type=submit]');
   const orig = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> ...';
 
-  try {
-    const data = Object.fromEntries(new FormData(form));
-    const resp = await fetch('https://formspree.io/f/xdkgpgvw', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
-    });
-    if (!resp.ok) throw new Error();
-    form.innerHTML = '<div class="form-success"><div class="form-success-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></div><h3 style="font-family:Barlow Condensed,sans-serif;font-weight:700;font-size:1.5rem;text-transform:uppercase;margin-bottom:1rem">Nachricht gesendet!</h3><p style="color:var(--zinc-600)">Vielen Dank! Wir melden uns in Kürze bei Ihnen.</p></div>';
-  } catch {
+  const showError = (msg) => {
     let errDiv = form.querySelector('.form-error');
     if (!errDiv) { errDiv = document.createElement('div'); errDiv.className = 'form-error'; form.appendChild(errDiv); }
-    errDiv.textContent = 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.';
+    errDiv.textContent = msg;
     btn.disabled = false;
     btn.innerHTML = orig;
+    if (window.turnstile) try { window.turnstile.reset(); } catch {}
+  };
+
+  // Get Turnstile token (Cloudflare auto-injects this hidden input)
+  const tokenEl = form.querySelector('input[name="cf-turnstile-response"]');
+  const token = tokenEl ? tokenEl.value : '';
+  if (!token) {
+    showError('Bitte warten Sie kurz, bis die Sicherheitsprüfung geladen ist, und versuchen Sie es erneut.');
+    return;
   }
-}
 
-async function submitQuoteForm(e) {
-  e.preventDefault();
-  const form = e.target;
-  const btn = form.querySelector('button[type=submit]');
-  const orig = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> ...';
 
+  const formData = Object.fromEntries(new FormData(form));
+  const hp = formData.website || '';
+  delete formData.website;
+  delete formData['cf-turnstile-response'];
+
   try {
-    const data = Object.fromEntries(new FormData(form));
-    const resp = await fetch('https://formspree.io/f/xdkgpgvw', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+    const resp = await fetch('/api/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type, data: formData, token, hp,
+        openedAt: Number(form.dataset.openedAt) || 0,
+      }),
     });
-    if (!resp.ok) throw new Error();
-    form.innerHTML = '<div class="form-success"><div class="form-success-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></div><h3 style="font-family:Barlow Condensed,sans-serif;font-weight:700;font-size:1.5rem;text-transform:uppercase;margin-bottom:1rem">Anfrage gesendet!</h3><p style="color:var(--zinc-600)">Vielen Dank! Wir senden Ihnen schnellstmöglich ein Angebot.</p></div>';
-  } catch {
-    let errDiv = form.querySelector('.form-error');
-    if (!errDiv) { errDiv = document.createElement('div'); errDiv.className = 'form-error'; form.appendChild(errDiv); }
-    errDiv.textContent = 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.';
-    btn.disabled = false;
-    btn.innerHTML = orig;
+    const result = await resp.json().catch(() => ({}));
+    if (!resp.ok || !result.ok) throw new Error(result.error || 'Unbekannter Fehler');
+
+    const success = type === 'contact'
+      ? { title: 'Nachricht gesendet!', text: 'Vielen Dank! Wir melden uns in Kürze bei Ihnen.' }
+      : { title: 'Anfrage gesendet!',  text: 'Vielen Dank! Wir senden Ihnen schnellstmöglich ein Angebot.' };
+
+    form.innerHTML = `<div class="form-success"><div class="form-success-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></div><h3 style="font-family:Barlow Condensed,sans-serif;font-weight:700;font-size:1.5rem;text-transform:uppercase;margin-bottom:1rem">${success.title}</h3><p style="color:var(--zinc-600)">${success.text}</p></div>`;
+  } catch (err) {
+    showError(err && err.message ? err.message : 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.');
   }
 }

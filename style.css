@@ -218,6 +218,7 @@ input, textarea, select { font-family: inherit; font-size: 1rem; }
 .form-success { text-align: center; padding: 3rem 2rem; }
 .form-success-icon { width: 80px; height: 80px; background: var(--yellow); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; }
 .form-error { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: .75rem 1rem; font-size: .875rem; margin-top: 1rem; }
+.hp-field { position: absolute !important; left: -10000px !important; top: auto !important; width: 1px !important; height: 1px !important; overflow: hidden !important; opacity: 0 !important; pointer-events: none !important; }
 
 /* ── About Page ── */
 .about-mission-grid { display: grid; grid-template-columns: 1fr; gap: 3rem; align-items: center; }
