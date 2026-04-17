@@ -74,7 +74,9 @@ export default async function handler(req, res) {
     });
     const tsJson = await tsResp.json().catch(() => ({}));
     if (!tsJson.success) {
-      return res.status(400).json({ error: 'Bot-Verifizierung fehlgeschlagen. Bitte erneut versuchen.' });
+      const codes = Array.isArray(tsJson['error-codes']) ? tsJson['error-codes'].join(', ') : 'unknown';
+      console.error('Turnstile verify failed:', codes, 'fullResponse:', JSON.stringify(tsJson));
+      return res.status(400).json({ error: `Bot-Verifizierung fehlgeschlagen (${codes}).` });
     }
 
     // ── 6. Validate & sanitize fields ──
