@@ -1,7 +1,5 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const escape = (s) =>
   String(s).replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -141,11 +139,16 @@ export default async function handler(req, res) {
   </td></tr>
 </table></body></html>`;
 
-    if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM || !process.env.RESEND_TO) {
-      console.error('Missing Resend env vars');
-      return res.status(500).json({ error: 'E-Mail-Konfiguration fehlt (Server).' });
+    const missing = [];
+    if (!process.env.RESEND_API_KEY) missing.push('RESEND_API_KEY');
+    if (!process.env.RESEND_FROM)    missing.push('RESEND_FROM');
+    if (!process.env.RESEND_TO)      missing.push('RESEND_TO');
+    if (missing.length) {
+      console.error('Missing env vars:', missing.join(', '));
+      return res.status(500).json({ error: `Server-Konfiguration fehlt: ${missing.join(', ')}` });
     }
 
+    const resend = new Resend(process.env.RESEND_API_KEY);
     const sendResult = await resend.emails.send({
       from: process.env.RESEND_FROM,
       to: process.env.RESEND_TO,
