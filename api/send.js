@@ -1,4 +1,4 @@
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 
 const escape = (s) =>
   String(s).replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -36,12 +36,12 @@ export default async function handler(req, res) {
     const body = typeof req.body === 'object' && req.body ? req.body : {};
     const { type, data, token, openedAt, hp } = body;
 
-    // ── 1. Honeypot — silently accept (don't tell bot it failed) ──
+    // ── 1. Honeypot ──
     if (typeof hp === 'string' && hp.length > 0) {
       return res.status(200).json({ ok: true });
     }
 
-    // ── 2. Time-trap (must be open at least 3s, max 4h) ──
+    // ── 2. Time-trap ──
     const elapsed = Date.now() - Number(openedAt || 0);
     if (!Number.isFinite(elapsed) || elapsed < 3000 || elapsed > 1000 * 60 * 60 * 4) {
       return res.status(400).json({ error: 'Bitte versuchen Sie es erneut.' });
@@ -55,7 +55,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid data' });
     }
 
-    // ── 4. IP (für Turnstile-Verifikation und Logging) ──
+    // ── 4. IP ──
     const fwd = req.headers['x-forwarded-for'];
     const ip = (Array.isArray(fwd) ? fwd[0] : (fwd || '').toString()).split(',')[0].trim() || 'unknown';
 
@@ -75,7 +75,7 @@ export default async function handler(req, res) {
     const tsJson = await tsResp.json().catch(() => ({}));
     if (!tsJson.success) {
       const codes = Array.isArray(tsJson['error-codes']) ? tsJson['error-codes'].join(', ') : 'unknown';
-      console.error('Turnstile verify failed:', codes, 'fullResponse:', JSON.stringify(tsJson));
+      console.error('Turnstile verify failed:', codes);
       return res.status(400).json({ error: `Bot-Verifizierung fehlgeschlagen (${codes}).` });
     }
 
@@ -119,9 +119,31 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Anfrage konnte nicht verarbeitet werden.' });
     }
 
-    // ── 7. Build & send email ──
+    // ── 7. Build & send email via IONOS SMTP ──
+    const missing = [];
+    if (!process.env.SMTP_HOST) missing.push('SMTP_HOST');
+    if (!process.env.SMTP_USER) missing.push('SMTP_USER');
+    if (!process.env.SMTP_PASS) missing.push('SMTP_PASS');
+    if (!process.env.MAIL_FROM) missing.push('MAIL_FROM');
+    if (!process.env.MAIL_TO)   missing.push('MAIL_TO');
+    if (missing.length) {
+      console.error('Missing SMTP env vars:', missing.join(', '));
+      return res.status(500).json({ error: `Server-Konfiguration fehlt: ${missing.join(', ')}` });
+    }
+
+    const port = Number(process.env.SMTP_PORT) || 465;
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port,
+      secure: port === 465,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+
     const rows = Object.entries(fields)
-      .filter(([_, v]) => v && v !== 'Nein' || _ === 'is_hazardous')
+      .filter(([k, v]) => (v && v !== 'Nein') || k === 'is_hazardous')
       .map(([k, v]) => {
         const label = FIELD_LABELS_DE[k] || k;
         return `<tr><td style="padding:8px 14px;background:#fafafa;border-bottom:1px solid #eee;font-weight:600;color:#111;width:200px">${escape(label)}</td><td style="padding:8px 14px;border-bottom:1px solid #eee;color:#27272a">${escape(v).replace(/\n/g, '<br>')}</td></tr>`;
@@ -141,29 +163,13 @@ export default async function handler(req, res) {
   </td></tr>
 </table></body></html>`;
 
-    const missing = [];
-    if (!process.env.RESEND_API_KEY) missing.push('RESEND_API_KEY');
-    if (!process.env.RESEND_FROM)    missing.push('RESEND_FROM');
-    if (!process.env.RESEND_TO)      missing.push('RESEND_TO');
-    if (missing.length) {
-      console.error('Missing env vars:', missing.join(', '));
-      return res.status(500).json({ error: `Server-Konfiguration fehlt: ${missing.join(', ')}` });
-    }
-
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const sendResult = await resend.emails.send({
-      from: process.env.RESEND_FROM,
-      to: process.env.RESEND_TO,
-      reply_to: fields.email,
+    await transporter.sendMail({
+      from: process.env.MAIL_FROM,
+      to: process.env.MAIL_TO,
+      replyTo: fields.email,
       subject,
       html,
     });
-
-    if (sendResult && sendResult.error) {
-      console.error('Resend error', sendResult.error);
-      const msg = sendResult.error.message || 'Mail konnte nicht versendet werden.';
-      return res.status(502).json({ error: `Resend: ${msg}` });
-    }
 
     return res.status(200).json({ ok: true });
   } catch (err) {
