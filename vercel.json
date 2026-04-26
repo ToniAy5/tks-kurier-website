@@ -1,0 +1,66 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": false,
+  "trailingSlash": false,
+  "redirects": [
+    { "source": "/Impressum.html",                "destination": "/impressum.html",               "statusCode": 301 },
+    { "source": "/Impressum",                     "destination": "/impressum.html",               "statusCode": 301 },
+    { "source": "/impressum",                     "destination": "/impressum.html",               "statusCode": 301 },
+    { "source": "/IMPRESSUM.html",                "destination": "/impressum.html",               "statusCode": 301 },
+    { "source": "/Datenschutz.html",              "destination": "/datenschutz.html",             "statusCode": 301 },
+    { "source": "/Datenschutz",                   "destination": "/datenschutz.html",             "statusCode": 301 },
+    { "source": "/datenschutz",                   "destination": "/datenschutz.html",             "statusCode": 301 },
+    { "source": "/DATENSCHUTZ.html",              "destination": "/datenschutz.html",             "statusCode": 301 },
+    { "source": "/Index.html",                    "destination": "/",                             "statusCode": 301 },
+    { "source": "/index.html",                    "destination": "/",                             "statusCode": 301 },
+    { "source": "/Services.html",                 "destination": "/services.html",                "statusCode": 301 },
+    { "source": "/services",                      "destination": "/services.html",                "statusCode": 301 },
+    { "source": "/Leistungen",                    "destination": "/services.html",                "statusCode": 301 },
+    { "source": "/leistungen",                    "destination": "/services.html",                "statusCode": 301 },
+    { "source": "/About.html",                    "destination": "/about.html",                   "statusCode": 301 },
+    { "source": "/about",                         "destination": "/about.html",                   "statusCode": 301 },
+    { "source": "/ueber-uns",                     "destination": "/about.html",                   "statusCode": 301 },
+    { "source": "/Contact.html",                  "destination": "/contact.html",                 "statusCode": 301 },
+    { "source": "/contact",                       "destination": "/contact.html",                 "statusCode": 301 },
+    { "source": "/Kontakt",                       "destination": "/contact.html",                 "statusCode": 301 },
+    { "source": "/kontakt",                       "destination": "/contact.html",                 "statusCode": 301 },
+    { "source": "/Quote.html",                    "destination": "/quote.html",                   "statusCode": 301 },
+    { "source": "/quote",                         "destination": "/quote.html",                   "statusCode": 301 },
+    { "source": "/Angebot",                       "destination": "/quote.html",                   "statusCode": 301 },
+    { "source": "/angebot",                       "destination": "/quote.html",                   "statusCode": 301 },
+    { "source": "/Service-Kurierdienste.html",    "destination": "/service-kurierdienste.html",   "statusCode": 301 },
+    { "source": "/service-kurierdienste",         "destination": "/service-kurierdienste.html",   "statusCode": 301 },
+    { "source": "/Service-Same-Day.html",         "destination": "/service-same-day.html",        "statusCode": 301 },
+    { "source": "/service-same-day",              "destination": "/service-same-day.html",        "statusCode": 301 },
+    { "source": "/Service-Gefahrgut.html",        "destination": "/service-gefahrgut.html",       "statusCode": 301 },
+    { "source": "/service-gefahrgut",             "destination": "/service-gefahrgut.html",       "statusCode": 301 },
+    { "source": "/Service-Sondertransporte.html", "destination": "/service-sondertransporte.html","statusCode": 301 },
+    { "source": "/service-sondertransporte",      "destination": "/service-sondertransporte.html","statusCode": 301 },
+    { "source": "/Service-Verteilertouren.html",  "destination": "/service-verteilertouren.html", "statusCode": 301 },
+    { "source": "/service-verteilertouren",       "destination": "/service-verteilertouren.html", "statusCode": 301 }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "geolocation=(), microphone=(), camera=()" },
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" }
+      ]
+    },
+    {
+      "source": "/(.*)\\.(png|jpg|jpeg|svg|webp|ico|webmanifest)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=604800, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/(favicon-16x16|favicon-32x32|icon-192|icon-512|apple-touch-icon)\\.png",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=2592000, immutable" }
+      ]
+    }
+  ]
+}
